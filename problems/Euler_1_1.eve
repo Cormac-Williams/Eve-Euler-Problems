@@ -1,0 +1,63 @@
+# Euler Problem 1
+Multiples of 3 and 5
+Problem 1
+If we list all the natural numbers below 10 that are multiples of 3 or 5, we get 3, 5, 6 and 9. The sum of these multiples is 23.
+
+Find the sum of all the multiples of 3 or 5 below 1000.
+
+### Set Up Globals.
+Count : The number of steps taken.
+last-count : Holds the previous start value of count for a calculation run.
+value : Accumulator for the sum so far. Holds the answer at the end.
+frames : Last frame value when the calculation manager runs.
+```
+commit
+[#count count:1 last-count:0 value:0 frames:0]
+```
+
+### Do the Calculation.
+There are a couple of variations that would work in the layout of the code. But a range is not a good answer, it leads you into infinite loops too easily.
+Stop calculating if count = 1000 or the count of this run = 290. The run will be restarted by another block. This avoids fixpoint problems.
+```eve
+search
+  cnt = [#count]
+
+  cnt.count < 1000
+  cnt.count - cnt.last-count < 290
+
+
+  a = mod[value:cnt.count by:3]
+  b = mod[value:cnt.count by:5]
+  
+  diff = if is(a = 0) = true then
+           cnt.count
+         if is(b = 0) = true then
+           cnt.count
+         else
+           0
+commit
+  cnt.count := cnt.count + 1
+  cnt.value := cnt.value + diff
+```
+
+### Manage the Calculation.
+If the calculation is turned off and frames is different from last run then reset the calculation.
+```eve
+search
+[#time frames]
+cnt = [#count]
+cnt.frames != frames
+cnt.count - cnt.last-count = 290
+commit
+  cnt.last-count := cnt.count
+  cnt.frames := frames
+```
+
+### Output the Answer.
+```eve
+search
+  cnt = [#count]
+bind @view
+  [#value value:"Answer = {{cnt.value}}"]
+  
+```
