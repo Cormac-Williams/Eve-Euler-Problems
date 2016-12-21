@@ -1,0 +1,312 @@
+
+### Globals
+```
+commit @prime  
+[#prime-cache largest-known-prime:3 ]
+  
+[#known-primes value:2]
+[#known-primes value:3]  
+[#known-primes value:5]
+  
+[#is-prime value:1000]  
+//[#prime-factors value:6170845]
+  //[#prime-factors value:110]
+  //[#prime-factors value:7355]
+  //[#prime-factors value:100000]
+[#prime-factors value:600851475143]
+```
+
+```
+commit
+  [#global frames:0]
+```
+
+
+```eve disabled
+search
+  value = range[from:1 to:100]
+commit @prime
+  [#is-prime value | ]
+```
+
+```eve disabled
+search @prime
+  calc = [#is-prime value < 25]
+bind @view
+  [#value value:"{{calc}} {{calc.value}}"]
+```
+
+```
+search @prime
+  calc = [#is-prime answered]
+  cnt = count[given:calc]
+bind @view
+  [#value value:cnt]
+
+```
+
+```eve disabled
+search @prime
+  calc = [#is-prime answered]
+bind @view
+  [#value value:calc]
+```
+
+```eve
+search @prime
+  calc = [#is-prime value not(answered)]
+  
+(result , answered) = if [#known-primes value] then
+             (true,true)
+           if mod[value by:2] = 0 then
+             (false , true)
+           if mod[value by:3] = 0 then
+             (false , true)
+           if mod[value by:5] = 0 then
+             (false , true)
+           else
+             (-1, false)
+commit @prime
+  calc.answered := answered
+  calc.result   := result
+
+```
+
+Is the number divisible by a known prime?
+```
+search @prime
+  nps  = [#known-primes value]
+  calc = [#is-prime not(answered)]
+  mod[value:calc.value by:value] = 0
+commit @prime
+  calc.answered := true
+  calc.result   := false
+```
+
+```
+search @prime
+  calc = [#is-prime not(i) not(w) value answered:false result:-1]
+
+commit @prime
+  calc.i := 5
+  calc.w := 2
+```
+
+```eve
+search @prime
+  calc = [#is-prime i w value answered:false result:-1]
+  value >= i * i
+  (result_tmp , answered_tmp) = if mod[value by:i] = 0 then
+             (false , true) else
+             (-1, false)
+commit @view
+  [#value value:"Test"]
+commit @prime
+  calc.i := i + w
+  calc.w := 6 - w
+  calc.answered := answered_tmp
+  calc.result   := result_tmp
+
+
+```
+
+While calculating. Search for primes as you step through.
+```eve disabled
+search @prime
+  calc = [#is-prime i w value answered:false result:-1]
+  not([#is-prime value:i])
+  not([#known-prime value:i])
+commit @prime
+  [#is-prime value:i]
+```
+
+```
+search @prime
+  calc = [#is-prime i w value answered:false result:-1]
+  value < i * i
+  (result_tmp , answered_tmp) = if true = true then (true , true)  
+commit @prime
+  calc.answered := true
+  calc.result   := true
+  [#known-primes value]
+
+```
+
+### Answer
+```
+search @prime
+  calc = [#is-prime value answered]
+bind @view
+  [#value value:"{{value}} {{answered}}"]
+
+
+
+```
+
+
+## Prime Factorisation.
+Use the below algorithm. Anything more complex if likely to run into Javascripts limitations on numbers.
+
+def prime_factors(n):
+"""Returns all the prime factors of a positive integer"""
+factors = []
+d = 2
+while n > 1:
+while n % d == 0:
+factors.append(d)
+n /= d
+d = d + 1
+if d*d > n:
+if n > 1: factors.append(n)
+break
+return factors
+### Detect start of calculation. Decorate with extra attributes.
+```
+search @prime
+  calc = [#prime-factors value not(d) ]
+commit @view
+  [#value value:"test"]
+commit @prime
+  calc.d := 2
+  calc.n := value
+  calc.last-count := 0
+  calc.count := 0
+
+```
+
+### Do Main Factorisation.
+```eve
+search @prime
+  calc = [#prime-factors value d n ]
+   n > 1
+   d * d <= n
+  
+  //Stop calculation before fixpoint.
+  calc.count - calc.last-count < 290
+  
+// If the mod is zero, mark as a factor. Else mark as null and increment d appropriately.
+  (factor, new_n , diff) = if mod[value:n by:d] = 0 then
+                              ("factor", n / d , 0) else
+                           if d = 2 then
+                              ("null" ,n ,1) else
+                              ("null" ,n ,2)
+commit @view
+  [#value value:"test"]
+commit @browser
+  [#div text:"N = {{n}}"]
+  [#div text:"D = {{d}}"]
+  
+commit @prime
+  calc.factors += [ tag:factor value factor:d n] 
+  calc.d := d + diff
+  calc.n := new_n
+  calc.count := calc.count + 1
+
+
+
+```
+
+### Final Factorisation.
+```
+search @prime
+  calc = [#prime-factors value
+  d n
+  ]
+   n > 1
+   d * d > n
+commit @prime
+  calc.factors += [ #factor value factor:n n] 
+  calc.n := 1
+
+ 
+
+
+```
+
+### Clean up any non-prime factors.
+```eve
+search @prime
+  calc = [#prime-factors n]
+  //n = 1
+  remove = [#null]
+commit @prime
+  remove := none
+
+
+
+```
+
+### Restart Factoristion if stopped to avoid fix-point.
+```
+search @session @prime
+  [#time frames]
+  
+  glb = [#global]
+  glb.frames != frames
+  
+  calc = [#prime-factors count last-count]
+  count - last-count = 290
+commit @view
+  [#value value:"Test {{frames}}"]
+commit
+  glb.frames := frames
+commit @prime
+  calc.last-count := count
+  
+```
+
+## Debug
+```eve disabled
+search @prime
+  calc = [#prime-factors d n ]
+bind @view
+  [#attribute-table entity:calc]
+```
+
+
+```eve
+search @prime
+  calc = [#prime-factors factors ]
+bind @view
+  [#attribute-table entity:factors]
+```
+
+```eve disabled
+search @prime
+  calc = [#prime-factors value d n factors]
+  cnt  = count[given:calc]
+bind @view
+  [#value value:calc]
+  [#attribute-table entity:calc]
+  [#attribute-table entity:factors]
+```
+
+```eve disabled
+search @prime
+  calc = [#known-primes value]
+bind @view
+  [#value value:"{{value}}"]
+```
+
+```eve disabled
+search @prime
+  calc = [#is-prime value answered result]
+  ix = sort[given:calc by:value]
+bind @view
+  [#value ix value:"{{value}} {{answered}} {{result}}"]
+
+```
+
+```
+search @view
+  wrapper = [#attribute-table entity]
+  lookup[record: wrapper, attribute: "tag", value: "attribute-table", node]
+
+search @prime @browser
+  lookup[record: entity attribute: key value]
+
+bind @view @browser
+  wrapper.node := node
+  wrapper.tag += "kv-table"
+  wrapper.kvs := [key value]
+```
